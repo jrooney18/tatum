@@ -27,8 +27,8 @@ def scale_kpts(points, segment, target):
     return points_scaled
   
 
-path = 'Keypoints Data\\'
-filename = 'kpts-3d.dat'
+path = 'Keypoints Data\Autumn\\'
+filename = 'kpts_3d_Autumn_0.dat'
 points, num_frames = kpt.read_kpts_3d_file(path + filename)
 
 points = kpt.orient_kpts(points)
@@ -48,50 +48,54 @@ points = np.concatenate((points, end_eff.reshape(1, 3, 60)), axis=0)
 end_eff_idx = 33
 
 # Find unit vectors to end effector and wrist
-end_eff_unit = kpt.unit_vector(points[end_eff_idx])
 wrist_unit = kpt.unit_vector(points[conn.wrist_r] - points[end_eff_idx])
 
-# Find angles of unit vectors relative to -Y in the XY plane and the YZ plane
-end_eff_angle_xy = np.arctan2(end_eff_unit[0], -end_eff_unit[1])
-end_eff_angle_yz = np.arctan2(end_eff_unit[2], -end_eff_unit[1])
-end_eff_angle_xz = np.arctan2(end_eff_unit[2], end_eff_unit[0])
-wrist_angle_xy = np.arctan2(wrist_unit[0], -wrist_unit[1])
-wrist_angle_yz = np.arctan2(wrist_unit[2], -wrist_unit[1])
+# Find angles of wrist unit vector relative to:
+#     The +X-axis in the XY plane
+#     The +X-axis in the XZ plane
+#     The +Z-axis in the YZ plane
+wrist_angle_xy = np.arctan2(wrist_unit[1], wrist_unit[0])
 wrist_angle_xz = np.arctan2(wrist_unit[2], wrist_unit[0])
+wrist_angle_yz = np.arctan2(wrist_unit[1], wrist_unit[2])
 
-# Subtract to find angle of forearm platform relative to end effector vector
-platform_angle_xy = wrist_angle_xy - end_eff_angle_xy
-platform_angle_yz = wrist_angle_yz - end_eff_angle_yz
-platform_angle_xz = wrist_angle_xz - end_eff_angle_xz
+# wrist_angle_xy = np.unwrap(wrist_angle_xy)
+# wrist_angle_xz = np.unwrap(wrist_angle_xz)
+wrist_angle_yz = np.unwrap(wrist_angle_yz)
+wrist_angle_xy = np.rad2deg(wrist_angle_xy)
+wrist_angle_xz = np.rad2deg(wrist_angle_xz)
+wrist_angle_yz = np.rad2deg(wrist_angle_yz) % 360
 
-# platform_angle_xy = np.unwrap(platform_angle_xy)
-# platform_angle_yz = np.unwrap(platform_angle_yz)
-platform_angle_xy = np.rad2deg(platform_angle_xy)
-platform_angle_yz = np.rad2deg(platform_angle_yz)
-platform_angle_xz = np.rad2deg(platform_angle_xz)
-
-angle_xy_filt = savgol_filter(platform_angle_xy, 15, 6)
-angle_yz_filt = savgol_filter(platform_angle_yz, 15, 6)
-angle_xz_filt = savgol_filter(platform_angle_xz, 15, 6)
+savgol_window = 7
+savgol_degree = 1
+x_filt = savgol_filter(end_eff[0], savgol_window, savgol_degree)
+y_filt = savgol_filter(end_eff[1], savgol_window, savgol_degree)
+z_filt = savgol_filter(end_eff[2], savgol_window, savgol_degree)
+angle_xy_filt = savgol_filter(wrist_angle_xy, savgol_window, savgol_degree)
+angle_xz_filt = savgol_filter(wrist_angle_xz, savgol_window, savgol_degree)
+angle_yz_filt = savgol_filter(wrist_angle_yz, savgol_window, savgol_degree)
 
 fig = plt.figure("t", figsize=(15, 10))
-ax1 = fig.add_subplot(121, projection='3d')
-ax2 = fig.add_subplot(122)
+ax1 = fig.add_subplot(131, projection='3d')
+ax2 = fig.add_subplot(132)
+ax3 = fig.add_subplot(133)
 
-num_frames = 32
+# num_frames = 24
 for i in range(num_frames):
-    vals = points[:, :, i]
+    # Clear axes
+    ax1.cla()
+    ax2.cla()
+    ax3.cla()
     
     # Plot points and lines for the body, arm, and axes
     kpt.plot_axes(ax1, length=0.1)
-    kpt.plot_kpts(ax1, vals, conn.body, 'mediumblue')
-    kpt.plot_kpts(ax1, vals, conn.arm_r, 'pink')
-    kpt.plot_kpts(ax1, vals, conn.arm_robot, 'fuchsia')
+    kpt.plot_kpts(ax1, points[:, :, i], conn.body, 'mediumblue')
+    kpt.plot_kpts(ax1, points[:, :, i], conn.arm_r, 'pink')
+    kpt.plot_kpts(ax1, points[:, :, i], conn.arm_robot, 'fuchsia')
 
-    ax1.plot(vals[end_eff_idx, 0],
-              vals[end_eff_idx, 1],
-              vals[end_eff_idx, 2],
-              'o', color='lime')
+    ax1.plot(points[:, :, i][end_eff_idx, 0],
+             points[:, :, i][end_eff_idx, 1],
+             points[:, :, i][end_eff_idx, 2],
+             'o', color='lime')
     
     kpt.set_axis_limits(ax1,
                         x_min=-0.1,
@@ -104,32 +108,59 @@ for i in range(num_frames):
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_zlabel('Z')
+
+    # Plot positions
+    ax2.plot(points[end_eff_idx, 0, :i], 'r')
+    ax2.plot(points[end_eff_idx, 1, :i], 'g')
+    ax2.plot(points[end_eff_idx, 2, :i], 'b')
+    ax2.set_xlim(0, num_frames)
+    ax2.legend(('X-coordinate',
+                'Y-coordinate',
+                'Z-coordinate'))
+    ax2.set_xlabel('Frame number')
+    ax2.set_ylabel('Position (m)')
+    ax2.set_title('Positions')
     
     # Plot angles
-    ax2.plot(platform_angle_xy[:i], 'r')
-    ax2.plot(platform_angle_yz[:i], 'g')
-    ax2.plot(platform_angle_xz[:i], 'b')
-    ax2.set_xlim(0, 60)
-    ax2.legend(('From -Y in XY plane',
-                'From -Y in YZ plane',
-                'From +X in XZ plane'))
-    ax2.set_xlabel('Frame number')
-    ax2.set_ylabel('Angle (degrees)')
-    
+    ax3.plot(wrist_angle_xy[:i], 'r')
+    ax3.plot(wrist_angle_xz[:i], 'g')
+    ax3.plot(wrist_angle_yz[:i], 'b')
+    ax3.set_xlim(0, num_frames)
+    ax3.legend(('From +X in XY plane',
+                'From +X in XZ plane',
+                'From +Z in YZ plane'))
+    ax3.set_xlabel('Frame number')
+    ax3.set_ylabel('Angle (degrees)')
+    ax3.set_title('Angles')
+
     plt.pause(0.01)
-    if i < num_frames - 1:
-        ax1.cla()
-        ax2.cla()
-    else:
-        ax2.cla()
-        ax2.plot(platform_angle_xy, color='pink')
-        ax2.plot(platform_angle_yz, color='lightgreen')
-        ax2.plot(platform_angle_xz, color='lightblue')
-        ax2.plot(angle_xy_filt, 'r')
-        ax2.plot(angle_yz_filt, 'g')
-        ax2.plot(angle_xz_filt, 'b')
-        ax2.legend(('From -Y in XY plane',
-                    'From -Y in YZ plane',
-                    'From +X in XZ plane'))
-        ax2.set_xlabel('Frame number')
-        ax2.set_ylabel('Angle (degrees)')
+
+ax2.cla()
+ax2.plot(points[end_eff_idx, 0, :i], color='pink')
+ax2.plot(points[end_eff_idx, 1, :i], color='lightgreen')
+ax2.plot(points[end_eff_idx, 2, :i], color='lightblue')
+ax2.plot(x_filt[:i], 'r')
+ax2.plot(y_filt[:i], 'g')
+ax2.plot(z_filt[:i], 'b')
+ax2.set_xlim(0, num_frames)
+ax2.legend(('X-coordinate',
+            'Y-coordinate',
+            'Z-coordinate'))
+ax2.set_xlabel('Frame number')
+ax2.set_ylabel('Position (m)')
+ax2.set_title('Positions')
+
+ax3.cla()
+ax3.plot(wrist_angle_xy[:i], color='pink')
+ax3.plot(wrist_angle_xz[:i], color='lightgreen')
+ax3.plot(wrist_angle_yz[:i], color='lightblue')
+ax3.plot(angle_xy_filt[:i], 'r')
+ax3.plot(angle_xz_filt[:i], 'g')
+ax3.plot(angle_yz_filt[:i], 'b')
+ax3.set_xlim(0, num_frames)
+ax3.legend(('From +X in XY plane',
+            'From +X in XZ plane',
+            'From +Z in YZ plane'))
+ax3.set_xlabel('Frame number')
+ax3.set_ylabel('Angle (degrees)')
+ax3.set_title('Angles')
