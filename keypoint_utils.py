@@ -141,8 +141,8 @@ def set_axis_limits(axes, x_min, x_max, y_min, y_max, z_min, z_max):
 
 
 if __name__ == '__main__':
-    path = 'Keypoints Data\\'
-    filename = 'kpts-bicep_curl.dat'
+    path = r'Keypoints Data\tpose_bend\\'
+    filename = r'kpts-tpose_bend0.dat'
     points, num_frames = read_kpts_3d_file(path + filename)
     
     points_oriented = orient_kpts(points)
