@@ -10,11 +10,9 @@ const float protocol_version = 2.0;
 const int baud_rate = 57600;
 const byte num_arms = 6;
 
-const byte button_pins[num_arms] = {0, 2, 4, 6, 8, 10};
 byte button_state;
 
-// Rotation value offsets for level platform that clears limits
-const int arm_offsets[num_arms] = {-2100, -7000, -7800, -5400, -1000, -1000};
+Arm arms[num_arms];
 
 Dynamixel2Arduino dxl(motor_serial, dxl_dir_pin);
 
@@ -31,118 +29,108 @@ void setup() {
   dxl.begin(baud_rate);
   dxl.setPortProtocolVersion(protocol_version);
 
-  // Configure each arm
+
   debug_serial.print("Configuring motors...");
-  Arm arms[] = {
-    Arm(dxl, 1, button_pins[0], arm_offsets[0]),
-    Arm(dxl, 2, button_pins[1], arm_offsets[1]),
-    Arm(dxl, 3, button_pins[2], arm_offsets[2]),
-    Arm(dxl, 4, button_pins[3], arm_offsets[3]),
-    Arm(dxl, 5, button_pins[4], arm_offsets[4]),
-    Arm(dxl, 6, button_pins[5], arm_offsets[5])
-  };
-  
-//  for (byte motor_id = 1; motor_id <= num_arms; motor_id++) {
-//    // Get motor info
-//    dxl.ping(motor_id);
-//    // Set motor operating mode
-//    dxl.torqueOff(motor_id);
-//    dxl.setOperatingMode(motor_id, OP_EXTENDED_POSITION);
-//    dxl.torqueOn(motor_id);
-//    // Set motor speed (0 = max. speed)
-//    // dxl.writeControlTableItem(PROFILE_VELOCITY, motor_id, 120);
-//  }
+
+  // Define arm parameters: overall length limits, motor rotation offsets from zero, and
+  // GPIO pins for hard limits
+  const float min_length = 226.8;
+  const float max_length = 310;
+  const int arm_offsets[num_arms] = {-2100, -7000, -7800, -5400, -1000, -1000};
+  const byte button_pins[num_arms] = {0, 2, 4, 6, 8, 10};
+
+  for (byte i = 0; i < num_arms; i++) {
+    arms[i] = Arm(dxl, i+1, button_pins[i], arm_offsets[i], min_length, max_length);
+  }
   debug_serial.println("done.");
 
-  // Configure button pins as digital input
-//  for (int i = 0; i < num_arms; i++) {
-//    pinMode(button_pins[i], INPUT_PULLUP);
-//  }
-
-  debug_serial.print("Moving to lower limit...");
-  delay(1000);
-  arms[3].move_mm(10);
-  while (!arms[3].is_limit_hit()) {
-    delay(5);
+  debug_serial.println("Homing platform");
+  set_home();
+  debug_serial.println("Platform homing complete.");
+  debug_serial.println("Ready.");
+}
+  
+void loop() {
+  delay(10);
+  float values[num_arms + 1];
+  while (!debug_serial.available()) {}
+  for (byte i = 0; i < num_arms + 1; i++) {
+     values[i] = handle_serial_input();
   }
-  arms[3].freeze();
-  debug_serial.println("done");
-  // Move all motors towards home
-//  int motor_position;
-//  for (byte motor_id = 1; motor_id <= num_arms; motor_id++) {
-//    motor_position = dxl.getPresentPosition(motor_id);
-//    dxl.setGoalPosition(motor_id, motor_position + 200000);
-//  }
-//
-//  // While moving, check if any limit stop is hit
-//  bool is_at_limit = false;
-//  while (is_at_limit == false) {
-//    delay(3);
-//    for (byte motor_id = 1; motor_id <= num_arms; motor_id++) {
-//      button_state = digitalRead(button_pins[motor_id - 1]);
-//      if (button_state == LOW) {
-//        is_at_limit = true;
-//        break;
-//      }
-//    }
-//  }
-//
-//  // When limit stop is hit, disable all motors
-//  for (byte motor_id = 1; motor_id <= num_arms; motor_id++) {
-//    dxl.torqueOff(motor_id);
-//  }
-//  debug_serial.println("done.");
-//  delay(1500);
-//
-//  // Individually home each motor
-//  debug_serial.println("Finding lower limits");
-//  for (byte motor_id = 1; motor_id <= num_arms; motor_id++) {
-//    dxl.torqueOn(motor_id);
-//    debug_serial.print("   Arm ");
-//    debug_serial.print(motor_id);
-//    debug_serial.print("...");
-//    delay(1000);
-//    
-//    // Turn arm one turn away from limit
-//    int motor_position = dxl.getPresentPosition(motor_id);
-//    motor_position = motor_position - 4096;
-//    dxl.setGoalPosition(motor_id, motor_position);
-//    delay(800);
-//    
-//    // Move motor maximum distance towards lower limit
-//    motor_position = motor_position + 200000;
-//    dxl.setGoalPosition(motor_id, motor_position);
-//    
-//    // If limit stop is hit, kill motor
-//    button_state = HIGH;
-//    while (button_state != LOW) {
-//      delay(10);
-//      button_state = digitalRead(button_pins[motor_id - 1]);
-//    }
-//    dxl.torqueOff(motor_id);
-//    delay(500);
-//
-//    // Reboot motor to clear turn counter and set position to zero
-//    dxl.reboot(motor_id);
-//    delay(1000);
-//    dxl.torqueOn(motor_id);
-//    dxl.setGoalPosition(motor_id, 0);
-//    delay(500);
-//    debug_serial.println("done.");
-//  }
-//  debug_serial.println("Lower limits set");
-//
-//  // Move to home, defined by arm_offsets
-//  debug_serial.print("Moving to home...");
-//  for (byte motor_id = 1; motor_id <= num_arms; motor_id++) {
-//    dxl.setGoalPosition(motor_id, arm_offsets[motor_id - 1]);
-//  }
-//  delay(1500);
-//  debug_serial.println("done. Platform homing complete.");
+  float array_sum = 0;
+  for (byte i = 0; i < num_arms; i++) {
+    array_sum = array_sum + values[i];
+  }
+  if (array_sum - values[num_arms] < 0.001) {
+    debug_serial.println("Data good");
+  }
+  for (byte i = 0; i < num_arms; i++) {
+    arms[i].set_length(values[i]);
+    delay(10);
+  }
 }
 
-void loop() {
-  while(!debug_serial.available());
-  String message = debug_serial.readString();
-  debug_serial.println("Hello!");
+float handle_serial_input() {
+  if (debug_serial.available() > 0) {
+    String incoming_string = debug_serial.readStringUntil('\n');
+    incoming_string.trim();
+    float incoming_value = atof(incoming_string.c_str());
+    debug_serial.print("Received: ");
+    debug_serial.println(incoming_value);
+    return incoming_value;
+  }
+}
+
+void set_home() {
+  // Move all arms towards limit
+  debug_serial.print("Moving to lower limit...");
+  delay(1000);
+  for (byte i = 0; i < num_arms; i++) {
+    arms[i].move_mm(-200);
+  }
+
+  // When one arm reaches limit, freeze all arms
+  bool is_at_limit = false;
+  while (is_at_limit == false) {
+    delay(3);
+    for (byte i = 0; i < num_arms; i++) {
+      if (arms[i].is_limit_hit()){
+        is_at_limit = true;
+        break;
+      }
+    }
+  }
+  for (byte i = 0; i < num_arms; i++) {
+    arms[i].freeze();
+  }
+  debug_serial.println("done");
+  delay(500);
+
+  // Individually home each motor
+  debug_serial.println("Finding lower limits");
+  for (byte i = 0; i < num_arms; i++) {
+    debug_serial.print("   Arm ");
+    debug_serial.print(i + 1);
+    debug_serial.print("...");
+    delay(1000);
+    
+    // Turn arm one turn away from limit
+    arms[i].move_mm(2);
+    delay(800);
+    
+    // Move motor maximum distance towards lower limit
+    arms[i].move_mm(-200);
+    
+    // If limit stop is hit, kill motor
+    while (!arms[i].is_limit_hit()) {}
+    arms[i].freeze();
+    delay(200);
+
+    // Reboot motor to clear turn counter, and go to home position
+    arms[i].reboot();
+    arms[i].move_home();
+    delay(500);
+    debug_serial.println("done.");
+  }
+  debug_serial.println("Lower limits set.");
 }
