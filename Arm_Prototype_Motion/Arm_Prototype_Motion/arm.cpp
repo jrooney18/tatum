@@ -1,16 +1,20 @@
 #include "arm.h"
 #include <Dynamixel2Arduino.h>
 
+using namespace ControlTableItem;
+
 Arm::Arm() {
 }
 
-Arm::Arm(Dynamixel2Arduino dxl, byte motor_id, byte button_pin, int offset, float min_length, float max_length) {
+Arm::Arm(Dynamixel2Arduino dxl, byte motor_id, byte button_pin, int offset, float min_length, float max_length, int max_rpm, int pitch) {
   this->dxl = dxl;
   this->motor_id = motor_id;
   this->button_pin = button_pin;
   this->offset = offset;
   this->min_length = min_length;
   this->max_length = max_length;
+  this->max_rpm = max_rpm;
+  this->pitch = pitch;
   init();
 }
 
@@ -18,6 +22,8 @@ void Arm::init() {
   dxl.ping(motor_id);
   dxl.torqueOff(motor_id);
   dxl.setOperatingMode(motor_id, OP_EXTENDED_POSITION);
+  dxl.writeControlTableItem(DRIVE_MODE, motor_id, 4); // Configure time-based profile
+  dxl.writeControlTableItem(PROFILE_VELOCITY, motor_id, 0);
   dxl.torqueOn(motor_id);
   pinMode(button_pin, INPUT_PULLUP);
   float current_length = 0;
@@ -37,8 +43,8 @@ void Arm::move_home() {
 
 void Arm::move_mm(int dist) {
   int current_pos = dxl.getPresentPosition(motor_id);
-  int num_revs = -dist * revs_per_mm;
-  dxl.setGoalPosition(motor_id, current_pos + num_revs);
+  int num_ticks = -dist * ticks_per_turn / pitch;
+  dxl.setGoalPosition(motor_id, current_pos + num_ticks);
   current_length = current_length + dist;
 }
 
@@ -66,4 +72,15 @@ bool Arm::set_length(float len) {
   float move_length = len - current_length;
   move_mm(move_length);
   return true;
+}
+
+int Arm::get_move_duration(float len) {
+  float move_length = len - current_length;
+  float num_revs = -move_length / pitch;
+  int move_duration = num_revs / max_rpm * 60000;
+  return abs(move_duration);
+}
+
+void Arm::set_move_duration(int duration) {
+  dxl.writeControlTableItem(PROFILE_VELOCITY, motor_id, duration);
 }

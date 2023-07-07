@@ -9,6 +9,7 @@ const int dxl_dir_pin = -1;
 const float protocol_version = 2.0;
 const int baud_rate = 57600;
 const byte num_arms = 6;
+const int motor_rpm = 84;
 
 byte button_state;
 
@@ -25,10 +26,13 @@ void setup() {
   while(!debug_serial);
   debug_serial.println("Initializing Arm Prototype 0.5");
 
-  // Set Port baudrate and protocol version.
+  // Initialize Dynamixel communictaion
   dxl.begin(baud_rate);
   dxl.setPortProtocolVersion(protocol_version);
 
+  // Disable motor power from the OpenRB
+  pinMode(31, OUTPUT);
+  digitalWrite(31, LOW);
 
   debug_serial.print("Configuring motors...");
 
@@ -38,9 +42,10 @@ void setup() {
   const float max_length = 310;
   const int arm_offsets[num_arms] = {-2100, -7000, -7800, -5400, -1000, -1000};
   const byte button_pins[num_arms] = {0, 2, 4, 6, 8, 10};
+  const int pitch = 2; // mm per lead screw turn
 
   for (byte i = 0; i < num_arms; i++) {
-    arms[i] = Arm(dxl, i+1, button_pins[i], arm_offsets[i], min_length, max_length);
+    arms[i] = Arm(dxl, i+1, button_pins[i], arm_offsets[i], min_length, max_length, motor_rpm, pitch);
   }
   debug_serial.println("done.");
 
@@ -64,10 +69,23 @@ void loop() {
   if (array_sum - values[num_arms] < 0.001) {
     debug_serial.println("Data good");
   }
+
+  int max_move_duration = 0;
+  for (byte i = 0; i < num_arms; i++) {
+    int move_duration = arms[i].get_move_duration(values[i]);
+    if (move_duration > max_move_duration) {
+      max_move_duration = move_duration;
+    }
+  }
+
+  for (byte i = 0; i < num_arms; i++) {
+    arms[i].set_move_duration(max_move_duration);
+  }
+  
   for (byte i = 0; i < num_arms; i++) {
     arms[i].set_length(values[i]);
-    delay(10);
   }
+  delay(10);
 }
 
 float handle_serial_input() {
