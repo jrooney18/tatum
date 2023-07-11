@@ -28,10 +28,14 @@ def read_kpts_3d_file(filename):
     num_frames = points.shape[2]
     return points, num_frames
 
-def unit_vector(point):
+def unit_vector(point, origin=None):
     ''' Returns [x, y, z] unit vector aligned from [0, 0, 0] to input point '''
-    magnitude = np.linalg.norm(point, axis=0)
-    unit = point / magnitude
+    if origin is not None:
+        magnitude = np.linalg.norm(point - origin, axis=0)
+        unit = (point - origin) / magnitude + origin
+    else:
+        magnitude = np.linalg.norm(point, axis=0)
+        unit = point / magnitude
     return unit
 
 def rotation_X(angle):
@@ -104,15 +108,35 @@ def orient_kpts(points):
     
     return points_oriented
 
+def scale_kpts(points, segment, target):
+    ''' Scale all keypoints to set the given segment to a fixed size
+    Arguments:
+        points (array): points to scale
+        segment(int 2-tuple): point indices for the reference segment
+        target (float): target length for the reference segment
+    Returns:
+        points_scaled
+    '''
+    lengths = np.linalg.norm(points[segment[0]] - points[segment[1]], axis=0)
+    scale_factor = target / lengths
+    scale_matrix = np.zeros((scale_factor.size, 3, 3))
+    scale_matrix[:] = np.eye(3)
+    scale_matrix = scale_matrix * scale_factor.reshape(scale_factor.size, 1, 1)
+    points_scaled = np.matmul(scale_matrix, points.transpose())
+    points_scaled = points_scaled.transpose()
+    
+    return points_scaled
+
 def plot_axes(axes, length=1):
     ''' Plots X,Y,Z vectors of given length (default 1) on the input axes '''
-    axes.plot([0, length], [0, 0], [0, 0], 'r')
-    axes.plot([0, 0], [0, length], [0, 0], 'g')
-    axes.plot([0, 0], [0, 0], [0, length], 'b')
-    axes.plot(length, 0, 0, 'ro')
-    axes.plot(0, length, 0, 'go')
-    axes.plot(0, 0, length, 'bo')
-    return None
+    artists = []
+    artists += axes.plot([0, length], [0, 0], [0, 0], 'r')
+    artists += axes.plot([0, 0], [0, length], [0, 0], 'g')
+    artists += axes.plot([0, 0], [0, 0], [0, length], 'b')
+    artists += axes.plot(length, 0, 0, 'ro')
+    artists += axes.plot(0, length, 0, 'go')
+    artists += axes.plot(0, 0, length, 'bo')
+    return artists
 
 def plot_kpts(axes, points, connections, color):
     ''' Plots keypoints according to defined connections
@@ -124,12 +148,13 @@ def plot_kpts(axes, points, connections, color):
             as (point 1, point 2)
         color (str): matplotlib-defined color
     '''
+    artists = []
     for _c in connections:
-        axes.plot([points[_c[0],0], points[_c[1],0]],
-                [points[_c[0],1], points[_c[1],1]],
-                [points[_c[0],2], points[_c[1],2]],
-                'o-', color=color)
-    return None
+        artists += axes.plot([points[_c[0],0], points[_c[1],0]],
+                             [points[_c[0],1], points[_c[1],1]],
+                             [points[_c[0],2], points[_c[1],2]],
+                             '.-', color=color)
+    return artists
 
 def set_axis_limits(axes, x_min, x_max, y_min, y_max, z_min, z_max):
     ''' Set limits for the x-, y-, and z-axes of an axes object in one pass '''
@@ -141,8 +166,8 @@ def set_axis_limits(axes, x_min, x_max, y_min, y_max, z_min, z_max):
 
 
 if __name__ == '__main__':
-    path = r'Keypoints Data\tpose_bend\\'
-    filename = r'kpts-tpose_bend0.dat'
+    path = r'Extreme ROM data\weird\\'
+    filename = r'kpts-weird2.dat'
     points, num_frames = read_kpts_3d_file(path + filename)
     
     points_oriented = orient_kpts(points)
@@ -160,16 +185,16 @@ if __name__ == '__main__':
         
         set_axis_limits(ax,
                         x_min=-5,
-                        x_max=10,
-                        y_min=-12,
+                        x_max=20,
+                        y_min=-30,
                         y_max=16,
-                        z_min=-20,
-                        z_max=10)
+                        z_min=-40,
+                        z_max=20)
         
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
         
-        plt.pause(0.05)
+        plt.pause(0.2)
         if i < num_frames - 1:
             ax.cla()

@@ -70,4 +70,6 @@ shoulder_l = 11
 shoulder_r = 12
 elbow_r = 14
 wrist_r = 16
+pinky_r = 18
+index_r = 20
 hip_r = 24
