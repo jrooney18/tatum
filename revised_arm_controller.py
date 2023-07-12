@@ -7,23 +7,7 @@ import arm_controller as arm
 import config_arm_prototype_horizontal as config
 import keypoint_connections as conn
 import keypoint_utils as kpt
-
-
-class shape3d:
-    def __init__(self, origin, points, segments):
-        self.origin = origin
-        self.points = points
-        self.segments = segments
-        
-    def set_segment_colors(self, colors):
-        self.segment_colors = colors
-    
-    def plot(self, ax):
-        for segment in segments:
-    
-    def translate(self, offset):
-        self.origin += offset
-        self.points += offset
+from shape3d import Shape3d
         
         
 # Read in keypoints from file
@@ -74,12 +58,12 @@ for i in range(num_frames):
     frame_artists = []
     
     # Define the world coordinate frame
-    origin = np.zeros(3)
-    frame = shape3d(origin,
-                    points=np.insert(np.eye(3), 0, 0, axis=1),
-                    connections=[[0, 1], [0, 2], [0, 3]]
-                    )
-    frame.set_segment_colors(['red', 'green', 'blue'])
+    # origin = np.zeros(3)
+    # frame = shape3d(origin,
+    #                 points=np.insert(np.eye(3), 0, 0, axis=1),
+    #                 connections=[[0, 1], [0, 2], [0, 3]]
+    #                 )
+    # frame.set_segment_colors(['red', 'green', 'blue'])
     frame = np.eye(3)
     unit = forearm_vector[:, i]
     cent = plat_center[:, [i]]

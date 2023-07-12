@@ -13,6 +13,13 @@ joint_angles = np.array([17.281,
                          257.281,
                          282.720])
 
+# Calculate joint positions using radius and angles
+joint_angles = np.deg2rad(joint_angles)
+joints = np.zeros([6, 3])
+joints[:, 0] = plat_radius * np.cos(joint_angles)
+joints[:, 1] = plat_radius * np.sin(joint_angles)
+joints[:, 2] = 0
+
 # Platform arm length limits
 min_length = 226.8
 max_length = 310
@@ -23,6 +30,11 @@ h_max = 40
 v_min = 210 # Hard lower limit: 197.534 mm
 v_max = 270
 
+# Length of the human forearm wrist-elbow and robot forearm wrist-end
+scale_factor = 0.5
+len_forearm = 235 * scale_factor  # mm
+len_robot   = 130 * scale_factor  # mm
+
 # Lower u-joint axis locations
 basepoints = np.array([[0, -14, -127.017],
                        [0,  14, -127.017],
@@ -30,4 +42,4 @@ basepoints = np.array([[0, -14, -127.017],
                        [0,  103, 75.633 ],
                        [0, -103, 75.633 ],
                        [0, -117, 51.384 ]]
-                      ).T
+                      )
