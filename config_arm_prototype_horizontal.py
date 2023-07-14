@@ -31,7 +31,7 @@ v_min = 210 # Hard lower limit: 197.534 mm
 v_max = 270
 
 # Length of the human forearm wrist-elbow and robot forearm wrist-end
-scale_factor = 0.5
+scale_factor = 1
 len_forearm = 235 * scale_factor  # mm
 len_robot   = 130 * scale_factor  # mm
 
@@ -43,3 +43,17 @@ basepoints = np.array([[0, -14, -127.017],
                        [0, -103, 75.633 ],
                        [0, -117, 51.384 ]]
                       )
+
+angle = np.deg2rad(75)
+cos = np.cos(angle)
+sin = np.sin(angle)
+z_rot = np.array([[cos, -sin, 0],
+                  [sin,  cos, 0],
+                  [0  ,  0  , 1]]
+                 )
+
+basepoints = np.matmul(z_rot, basepoints.T)
+basepoints = basepoints.T
+
+offset = np.array([190, -200, 0])
+basepoints = basepoints + offset

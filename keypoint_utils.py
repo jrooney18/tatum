@@ -166,18 +166,23 @@ def set_axis_limits(axes, x_min, x_max, y_min, y_max, z_min, z_max):
 
 
 if __name__ == '__main__':
-    path = r'Extreme ROM data\weird\\'
-    filename = r'kpts-weird2.dat'
+    path = r'Extreme ROM data\extremes\\'
+    filename = r'kpts_3D_extremes_1.dat'
     points, num_frames = read_kpts_3d_file(path + filename)
     
     points_oriented = orient_kpts(points)
+    points_oriented = scale_kpts(points,
+                                  (conn.wrist_r, conn.elbow_r),
+                                  235)
     
     fig = plt.figure("t", figsize=(15, 10))
     ax = fig.add_subplot(111, projection='3d')
     
+    lengths = np.zeros([num_frames, 2])
+    
     for i in range(num_frames):
         vals = points_oriented[:, :, i]
-        
+    
         # Plot points and lines for the body, arm, and axes
         plot_axes(ax, length=2)
         plot_kpts(ax, vals, conn.body, 'mediumblue')
@@ -195,6 +200,6 @@ if __name__ == '__main__':
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
         
-        plt.pause(0.2)
+        plt.pause(0.1)
         if i < num_frames - 1:
             ax.cla()

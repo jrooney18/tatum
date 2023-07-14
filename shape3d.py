@@ -59,7 +59,9 @@ class Shape3d:
         self.quat = quaternion.Quaternion(np.zeros(3), 0)
         self.locate_points()
         self.edges = edges
-        self.axes_colors = ['red', 'green', 'blue']
+        
+        self.edge_colors = [None] * len(edges)
+        self.set_axes_colors(['red', 'green', 'blue'])
     
     def locate_points(self):
         self.points_local = quaternion.rotate_via_quat(self.points_local,
@@ -85,6 +87,18 @@ class Shape3d:
     
     def get_global_points(self):
         return self.points_global
+    
+    def get_edge_lengths(self):
+        self.lengths = np.zeros(len(self.edges))
+        for i, edge in enumerate(self.edges):
+            self.lengths[i] = np.sqrt(
+                (self.points_local[edge[0]][0] -
+                 self.points_local[edge[1]][0]) ** 2 +
+                (self.points_local[edge[0]][1] -
+                 self.points_local[edge[1]][1]) ** 2 +
+                (self.points_local[edge[0]][2] -
+                 self.points_local[edge[1]][2]) ** 2 )
+        return self.lengths
         
     def translate(self, offset):
         self.origin += offset
@@ -92,13 +106,14 @@ class Shape3d:
     
     def align_with_vector(self, vector):
         # Normalize the input vector
-        vector /= np.linalg.norm(vector)
+        _vector = vector / np.linalg.norm(vector)
         
         # Find the quaternion that aligns the local Z-axis with the vector
-        axis = np.cross(vector, self.axes_local[2])
+        axis = np.cross(_vector, self.axes_local[2])
         if np.sum(abs(axis)) != 0:
             axis /= np.linalg.norm(axis)
-        angle = np.arccos(np.dot(vector, self.axes_local[2]))
+        # Dot product rounded to 5 decimals to avoid floating point errors
+        angle = np.arccos(np.dot(_vector, self.axes_local[2]).round(5))
         self.quat = quaternion.Quaternion(axis, angle)
         self.locate_points()
     
