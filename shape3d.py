@@ -53,55 +53,60 @@ class Shape3d:
             origin (1D array)
                 XYZ coordinates in the world frame. Defaults to [0, 0, 0].
         '''
-        self.origin = origin
-        self.points_local = points_local
-        self.axes_local = np.eye(3)
-        self.quat = quaternion.Quaternion(np.zeros(3), 0)
+        self._origin = origin
+        self._points_local = points_local
+        self._axes_local = np.eye(3)
+        self._quat = quaternion.Quaternion(np.zeros(3), 0)
         self.locate_points()
-        self.edges = edges
+        self._edges = edges
         
-        self.edge_colors = [None] * len(edges)
+        self._edge_colors = [None] * len(edges)
         self.set_axes_colors(['red', 'green', 'blue'])
     
     def locate_points(self):
-        self.points_local = quaternion.rotate_via_quat(self.points_local,
-                                                        self.quat)
-        self.axes_local = quaternion.rotate_via_quat(self.axes_local,
-                                                      self.quat)
-        self.points_global = self.points_local + self.origin
-        self.axes_global = self.axes_local + self.origin
+        self._points_local = quaternion.rotate_via_quat(self._points_local,
+                                                        self._quat)
+        self._axes_local = quaternion.rotate_via_quat(self._axes_local,
+                                                      self._quat)
+        self._points_global = self._points_local + self._origin
+        self._axes_global = self._axes_local + self._origin
         self.reset_rotation()
     
     def reset_rotation(self):
-        self.quat = quaternion.Quaternion(np.zeros(3), 0)
-        
-    def set_origin(self, point):
-        self.origin = point
+        self._quat = quaternion.Quaternion(np.zeros(3), 0)
+    
+    @property
+    def origin(self):
+        return self._origin
+    
+    @origin.setter
+    def origin(self, point):
+        self._origin = point
         self.locate_points()
-        
-    def get_origin(self):
-        return self.origin
     
-    def get_local_axes(self):
-        return self.axes_local
+    @property
+    def local_axes(self):
+        return self._axes_local
     
-    def get_global_points(self):
-        return self.points_global
+    @property
+    def global_points(self):
+        return self._points_global
     
-    def get_edge_lengths(self):
-        self.lengths = np.zeros(len(self.edges))
-        for i, edge in enumerate(self.edges):
-            self.lengths[i] = np.sqrt(
-                (self.points_local[edge[0]][0] -
-                 self.points_local[edge[1]][0]) ** 2 +
-                (self.points_local[edge[0]][1] -
-                 self.points_local[edge[1]][1]) ** 2 +
-                (self.points_local[edge[0]][2] -
-                 self.points_local[edge[1]][2]) ** 2 )
-        return self.lengths
+    @property
+    def edge_lengths(self):
+        self._lengths = np.zeros(len(self._edges))
+        for i, edge in enumerate(self._edges):
+            self._lengths[i] = np.sqrt(
+                (self._points_local[edge[0]][0] -
+                 self._points_local[edge[1]][0]) ** 2 +
+                (self._points_local[edge[0]][1] -
+                 self._points_local[edge[1]][1]) ** 2 +
+                (self._points_local[edge[0]][2] -
+                 self._points_local[edge[1]][2]) ** 2 )
+        return self._lengths
         
     def translate(self, offset):
-        self.origin += offset
+        self._origin += offset
         self.locate_points
     
     def align_with_vector(self, vector):
@@ -109,53 +114,53 @@ class Shape3d:
         _vector = vector / np.linalg.norm(vector)
         
         # Find the quaternion that aligns the local Z-axis with the vector
-        axis = np.cross(_vector, self.axes_local[2])
+        axis = np.cross(_vector, self._axes_local[2])
         if np.sum(abs(axis)) != 0:
             axis /= np.linalg.norm(axis)
         # Dot product rounded to 5 decimals to avoid floating point errors
-        angle = np.arccos(np.dot(_vector, self.axes_local[2]).round(5))
-        self.quat = quaternion.Quaternion(axis, angle)
+        angle = np.arccos(np.dot(_vector, self._axes_local[2]).round(5))
+        self._quat = quaternion.Quaternion(axis, angle)
         self.locate_points()
     
     def rotate_about_z(self, angle):
         ''' Rotate shape about its local z-axis by angle (radians)'''
-        self.quat = quaternion.Quaternion(self.axes_local[2], angle)
+        self._quat = quaternion.Quaternion(self._axes_local[2], angle)
         self.locate_points()
-        
+    
     def set_edge_colors(self, colors):
         if type(colors)== list:
-            self.edge_colors = colors
+            self._edge_colors = colors
         elif type(colors) == str:
-            self.edge_colors = [colors]
-            self.edge_colors.extend([colors] * (len(self.edges) - 1))
+            self._edge_colors = [colors]
+            self._edge_colors.extend([colors] * (len(self._edges) - 1))
     
     def set_axes_colors(self, colors):
-        self.axes_colors = colors
+        self._axes_colors = colors
     
     def plot(self, ax):
         ''' Plot the shape on the input 3d axes. '''
         artists = []
-        for i, edge in enumerate(self.edges):
+        for i, edge in enumerate(self._edges):
             artists += ax.plot(
-                [self.points_global[edge[0]][0], self.points_global[edge[1]][0]],
-                [self.points_global[edge[0]][1], self.points_global[edge[1]][1]],
-                [self.points_global[edge[0]][2], self.points_global[edge[1]][2]],
-                color=self.edge_colors[i]
+                [self._points_global[edge[0]][0], self._points_global[edge[1]][0]],
+                [self._points_global[edge[0]][1], self._points_global[edge[1]][1]],
+                [self._points_global[edge[0]][2], self._points_global[edge[1]][2]],
+                color=self._edge_colors[i]
                 )
         return artists
     
     def plot_axes(self, ax, scale=1):
         ''' Plot the shape's axes on the input 3d axes. '''
         artists = []
-        _axes = self.axes_global - self.origin
+        _axes = self._axes_global - self._origin
         _axes *= scale
-        _axes += self.origin
+        _axes += self._origin
         for i in range(3):
             artists += ax.plot(
-                [self.origin[0], _axes[i, 0]],
-                [self.origin[1], _axes[i, 1]],
-                [self.origin[2], _axes[i, 2]],
-                color=self.axes_colors[i]
+                [self._origin[0], _axes[i, 0]],
+                [self._origin[1], _axes[i, 1]],
+                [self._origin[2], _axes[i, 2]],
+                color=self._axes_colors[i]
                 )
         return artists
         
@@ -195,7 +200,7 @@ if __name__ == '__main__':
         vector = np.array([np.sin(i*3), 0, np.cos(i*3)])
         
         # Transform cube
-        cube.set_origin(new_point)
+        cube.origin = new_point
         cube.align_with_vector(vector)
         cube.rotate_about_z(np.deg2rad(5))
         

@@ -55,11 +55,11 @@ artists = []
 # for frame in range(0, 11):
 for frame in range(num_frames):
     # Align the platform with the forearm
-    platform.set_origin(forearm_point[:, frame])
+    platform.origin = forearm_point[:, frame]
     platform.align_with_vector(forearm_vector[:, frame])
     
     # Find the angle to align the platform's x-axis with hand rotation
-    axes = platform.get_local_axes()
+    axes = platform.local_axes
     base_vector = config.basepoints[0] - config.basepoints[1]
     base_vector /= np.linalg.norm(base_vector)
     cross = np.cross(axes[2], base_vector)
@@ -84,7 +84,7 @@ for frame in range(num_frames):
     # platform.rotate_about_z(-(angle_x_to_hand - .785))
     ###########################################################################
     
-    plat_points = platform.get_global_points()
+    plat_points = platform.global_points
     
     # Calculate leg lengths 
     lengths = np.zeros(config.num_legs)
