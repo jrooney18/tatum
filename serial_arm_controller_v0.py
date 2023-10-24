@@ -3,8 +3,6 @@ import numpy as np
 import serial
 import time
 
-import config_arm_prototype as config
-
 
 def read_serial(port):
     ''' Reads line at open port, converts to a string, and removes limiters '''
@@ -152,88 +150,49 @@ def plot_platform(ax,
 
 if __name__ == '__main__':
 # Open serial communication with OpenRB
+    
+    num_motors = 7
+    
+    pose_1 = np.array([1200, 1600, 2500, 1800, 3700, 1600, 2000])
+    pose_2 = np.array([1200, 1600, 2500, 1250, 3500, 2200, 2000])
+    
     with serial.Serial(port='COM7', baudrate=115200, timeout=0.5) as openrb:
-        ax = plt.figure(figsize=(12,10)).add_subplot(projection='3d')
-        
-        # while True:
-        #     message = read_serial(openrb)
-        #     if message:
-        #         if message.endswith('...'):
-        #             print(message, end='')
-        #         else:
-        #             print(message)
-        #         if message == 'Ready.':
-        #             break
-        #     time.sleep(.05)
+        # ax = plt.figure(figsize=(12,10)).add_subplot(projection='3d')
         
         while True:
-            # Generate random coordinates for the platform center
-            plat_center = np.zeros([3, 1])
-            plat_center[0] = np.random.uniform(low=config.h_min,
-                                               high=config.h_max)
-            plat_center[1] = np.random.uniform(low=config.h_min,
-                                               high=config.h_max)
-            plat_center[2] = np.random.uniform(low=config.v_min,
-                                               high=config.v_max)
-            
-            # Generate a random unit vector to align to
-            arm_vector = np.random.rand(3)
-            arm_vector[0:2] = (arm_vector[0:2] * 2) - 1
-            arm_vector = arm_vector / np.linalg.norm(arm_vector)
-            
-            # Find the un-oriented location of the platform joints
-            plat_joints = get_joint_positions(plat_center,
-                                              config.plat_radius,
-                                              config.joint_angles)
-            
-            # Orient the platform along the given unit vector
-            plat_joints_rot = orient_platform(arm_vector,
-                                              plat_center,
-                                              plat_joints)
-            
-            
-            # Calculate leg lengths, and initialize final spot for checksum
-            lengths = np.zeros(config.num_legs)
-            for i in range(config.num_legs):
-                lengths[i] = np.sqrt(
-                    (plat_joints_rot[0, (i-3)%6] - config.basepoints[0, i])**2+
-                    (plat_joints_rot[1, (i-3)%6] - config.basepoints[1, i])**2+
-                    (plat_joints_rot[2, (i-3)%6] - config.basepoints[2, i])**2
-                    )
-            lengths = lengths.round(1)
+            message = read_serial(openrb)
+            if message:
+                if message.endswith('...'):
+                    print(message, end='')
+                else:
+                    print(message)
+                if message == 'Ready.':
+                    break
+            time.sleep(.05)
+        
+        num_run = 0
+        while True:
+            if num_run % 2:
+                pose = pose_1
+            else:
+                pose = pose_2
             
             # Wait for user input to proceed
             command = input()
             if command == 'x':
                 break
-            
-            # Plot platform position
-            ax.cla()
-            plot_platform(ax,
-                          arm_vector,
-                          plat_center,
-                          config.basepoints,
-                          plat_joints_rot,
-                          color='slateblue')
-            ax.set_zlim([0, 230])
-            ax.set_aspect('equal')
-            plt.pause(0.05)
-            
-            # Transmit data only if all lengths are achievable
-            if ((lengths > config.min_length).all()
-            and (lengths < config.max_length).all()):
                 
-                # Add checksum to leg lengths
-                lengths = np.append(lengths, np.sum(lengths))
+            # Add checksum to leg lengths
+            pose = np.append(pose, np.sum(pose))
+            
+            for value in pose:
+                openrb.write(str(value).encode())
+                openrb.write('\n'.encode())
+            for i in range(pose.size + 1):
+                received_data = openrb.readline()
                 
-                for length in lengths:
-                    openrb.write(str(length).encode())
-                    openrb.write('\n'.encode())
-                for i in range(lengths.size + 1):
-                    received_data = openrb.readline()
-                    print(f'Message {i}: ',
-                          received_data.decode('utf-8').strip())
-            else:
-                print('Out of bounds')
+                print(f'Message {i}: ',
+                      received_data.decode('utf-8').strip())
+            num_run += 1
             
     print('Connection terminated.')
